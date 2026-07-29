@@ -1,6 +1,6 @@
 module "gke_autopilot" {
   source  = "terraform-google-modules/kubernetes-engine/google//modules/gke-autopilot-cluster"
-  version = "~> 36.0"
+  version = "~> 44.3.0"
 
   project_id = var.project_id
   name       = var.cluster_name
