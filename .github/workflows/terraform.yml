@@ -2,9 +2,9 @@ name: Terraform Pipeline
 
 on:
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 permissions:
   id-token: write
@@ -18,9 +18,10 @@ env:
 jobs:
   # ---------------------------------------------------------------------------
   # 1. Work out which root modules (vpc/, iam/, gke/) actually need to run.
-  #    - A change under modules/ (shared child modules) affects all three,
-  #      since vpc/, iam/, and gke/ all call into modules/.
-  #    - A change under vpc/, iam/, or gke/ only affects that one root module.
+  #    - A change under gke-platform/modules/ (shared child modules) affects
+  #      all three, since vpc/, iam/, and gke/ all call into modules/.
+  #    - A change under gke-platform/vpc/, iam/, or gke/ only affects that
+  #      one root module.
   # ---------------------------------------------------------------------------
   detect_changes:
     runs-on: ubuntu-latest
@@ -56,17 +57,17 @@ jobs:
 
           COMPONENTS="[]"
 
-          if echo "$CHANGED" | grep -q "^modules/"; then
+          if echo "$CHANGED" | grep -q "^gke-platform/modules/"; then
             echo "Shared module changed - all root modules must run"
             COMPONENTS='["vpc","iam","gke"]'
           else
-            if echo "$CHANGED" | grep -q "^vpc/"; then
+            if echo "$CHANGED" | grep -q "^gke-platform/vpc/"; then
               COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["vpc"]')
             fi
-            if echo "$CHANGED" | grep -q "^iam/"; then
+            if echo "$CHANGED" | grep -q "^gke-platform/iam/"; then
               COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["iam"]')
             fi
-            if echo "$CHANGED" | grep -q "^gke/"; then
+            if echo "$CHANGED" | grep -q "^gke-platform/gke/"; then
               COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["gke"]')
             fi
           fi
@@ -89,7 +90,7 @@ jobs:
         component: ${{ fromJson(needs.detect_changes.outputs.components) }}
     defaults:
       run:
-        working-directory: ${{ matrix.component }}
+        working-directory: gke-platform/${{ matrix.component }}
     steps:
       - uses: actions/checkout@v4
 
@@ -142,7 +143,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: vpc
+        working-directory: gke-platform/vpc
     steps:
       - uses: actions/checkout@v4
 
@@ -177,7 +178,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: iam
+        working-directory: gke-platform/iam
     steps:
       - uses: actions/checkout@v4
 
@@ -222,7 +223,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: gke
+        working-directory: gke-platform/gke
     steps:
       - uses: actions/checkout@v4
 
