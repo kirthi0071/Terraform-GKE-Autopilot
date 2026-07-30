@@ -136,7 +136,7 @@ jobs:
     needs: [detect_changes, terraform-plan]
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
+      github.ref == 'refs/heads/main' &&
       contains(needs.detect_changes.outputs.components, 'vpc')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -171,7 +171,7 @@ jobs:
     needs: [detect_changes, terraform-plan]
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
+      github.ref == 'refs/heads/main' &&
       contains(needs.detect_changes.outputs.components, 'iam')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -214,7 +214,7 @@ jobs:
     if: >
       always() &&
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
+      github.ref == 'refs/heads/main' &&
       contains(needs.detect_changes.outputs.components, 'gke') &&
       (needs.terraform-apply-vpc.result == 'success' || needs.terraform-apply-vpc.result == 'skipped') &&
       (needs.terraform-apply-iam.result == 'success' || needs.terraform-apply-iam.result == 'skipped')
