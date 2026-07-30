@@ -8,3 +8,4 @@ module "network" {
   ingress_rules    = var.ingress_rules
   egress_rules     = var.egress_rules
 }
+# ci test Thu Jul 30 18:09:18 IST 2026
