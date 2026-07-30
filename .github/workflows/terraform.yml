@@ -2,7 +2,7 @@ name: Terraform Pipeline
 
 on:
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
   push:
     branches: [ "main" ]
 
