@@ -22,11 +22,16 @@ jobs:
   #      all three, since vpc/, iam/, and gke/ all call into modules/.
   #    - A change under gke-platform/vpc/, iam/, or gke/ only affects that
   #      one root module.
+  #    Outputs are three independent booleans instead of one combined JSON
+  #    array/matrix - this lets each component's plan/apply track its own
+  #    pass/fail without one failing component skipping the others.
   # ---------------------------------------------------------------------------
   detect_changes:
     runs-on: ubuntu-latest
     outputs:
-      components: ${{ steps.filter.outputs.components }}
+      vpc: ${{ steps.filter.outputs.vpc }}
+      iam: ${{ steps.filter.outputs.iam }}
+      gke: ${{ steps.filter.outputs.gke }}
     steps:
       - name: Checkout full history
         uses: actions/checkout@v4
@@ -43,54 +48,61 @@ jobs:
             echo "Running on PR"
             git fetch origin ${{ github.base_ref }} --depth=1
             BASE="origin/${{ github.base_ref }}"
-            HEAD="HEAD"
           else
             echo "Running on push"
-            BASE="HEAD~1"
-            HEAD="HEAD"
+            # github.event.before is the commit the branch pointed to before
+            # this push. Using it (instead of HEAD~1) means a push containing
+            # several commits is diffed in full, not just the last commit.
+            # On a brand new branch/first push, "before" is all zeros - fall
+            # back to HEAD~1 in that case.
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              BASE="HEAD~1"
+            else
+              BASE="${{ github.event.before }}"
+            fi
           fi
+          HEAD="HEAD"
 
           echo "Diff range: $BASE $HEAD"
           CHANGED=$(git diff --name-only $BASE..$HEAD || true)
           echo "Changed files:"
           echo "$CHANGED"
 
-          COMPONENTS="[]"
+          VPC=false
+          IAM=false
+          GKE=false
 
           if echo "$CHANGED" | grep -q "^gke-platform/modules/"; then
             echo "Shared module changed - all root modules must run"
-            COMPONENTS='["vpc","iam","gke"]'
+            VPC=true
+            IAM=true
+            GKE=true
           else
-            if echo "$CHANGED" | grep -q "^gke-platform/vpc/"; then
-              COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["vpc"]')
-            fi
-            if echo "$CHANGED" | grep -q "^gke-platform/iam/"; then
-              COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["iam"]')
-            fi
-            if echo "$CHANGED" | grep -q "^gke-platform/gke/"; then
-              COMPONENTS=$(echo "$COMPONENTS" | jq -c '. + ["gke"]')
-            fi
+            echo "$CHANGED" | grep -q "^gke-platform/vpc/" && VPC=true
+            echo "$CHANGED" | grep -q "^gke-platform/iam/" && IAM=true
+            echo "$CHANGED" | grep -q "^gke-platform/gke/" && GKE=true
           fi
 
-          echo "components=$COMPONENTS" >> "$GITHUB_OUTPUT"
+          echo "vpc=$VPC" >> "$GITHUB_OUTPUT"
+          echo "iam=$IAM" >> "$GITHUB_OUTPUT"
+          echo "gke=$GKE" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
-  # 2. Plan every changed root module in parallel. Safe to run concurrently -
-  #    plan is read-only.
+  # 2. Plan each changed root module as its own job (not a matrix). This is
+  #    the key fix: with a matrix, one component's plan failing marks the
+  #    whole "terraform-plan" job as failed, which blocks the apply jobs for
+  #    every component - even ones whose plan was clean. Separate jobs mean
+  #    each component's success/failure is tracked independently.
   # ---------------------------------------------------------------------------
-  terraform-plan:
-    name: "Terraform Plan (${{ matrix.component }})"
+  terraform-plan-vpc:
+    name: "Terraform Plan (vpc)"
     needs: detect_changes
-    if: ${{ needs.detect_changes.outputs.components != '[]' }}
+    if: needs.detect_changes.outputs.vpc == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        component: ${{ fromJson(needs.detect_changes.outputs.components) }}
     defaults:
       run:
-        working-directory: gke-platform/${{ matrix.component }}
+        working-directory: gke-platform/vpc
     steps:
       - uses: actions/checkout@v4
 
@@ -100,7 +112,6 @@ jobs:
           terraform_version: '1.9.0'
 
       - name: Authenticate to GCP
-        id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
@@ -124,21 +135,115 @@ jobs:
         uses: mshick/add-pr-comment@v2
         with:
           message: |
-            ## Terraform Plan for `${{ matrix.component }}`
+            ## Terraform Plan for `vpc`
+            ```
+            ${{ steps.plan.outputs.stdout }}
+            ```
+
+  terraform-plan-iam:
+    name: "Terraform Plan (iam)"
+    needs: detect_changes
+    if: needs.detect_changes.outputs.iam == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gke-platform/iam
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Terraform Init
+        run: terraform init -backend-config=${{ env.TF_BACKEND_FILE }}
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -var-file=${{ env.TF_VAR_FILE }}
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            ## Terraform Plan for `iam`
+            ```
+            ${{ steps.plan.outputs.stdout }}
+            ```
+
+  terraform-plan-gke:
+    name: "Terraform Plan (gke)"
+    needs: detect_changes
+    if: needs.detect_changes.outputs.gke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gke-platform/gke
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.0'
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Terraform Init
+        run: terraform init -backend-config=${{ env.TF_BACKEND_FILE }}
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -var-file=${{ env.TF_VAR_FILE }}
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            ## Terraform Plan for `gke`
             ```
             ${{ steps.plan.outputs.stdout }}
             ```
 
   # ---------------------------------------------------------------------------
   # 3. Apply vpc/ and iam/ in parallel - neither depends on the other.
+  #    Each only needs its own plan job to have succeeded, so a failure in
+  #    the other component's plan no longer blocks this one.
   # ---------------------------------------------------------------------------
   terraform-apply-vpc:
     name: "Terraform Apply (vpc)"
-    needs: [detect_changes, terraform-plan]
+    needs: [detect_changes, terraform-plan-vpc]
     if: >
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      contains(needs.detect_changes.outputs.components, 'vpc')
+      needs.detect_changes.outputs.vpc == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -169,11 +274,11 @@ jobs:
 
   terraform-apply-iam:
     name: "Terraform Apply (iam)"
-    needs: [detect_changes, terraform-plan]
+    needs: [detect_changes, terraform-plan-iam]
     if: >
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      contains(needs.detect_changes.outputs.components, 'iam')
+      needs.detect_changes.outputs.iam == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -207,16 +312,19 @@ jobs:
   #    so it must not run until both of those have finished applying (if they
   #    ran at all this pipeline). If vpc/iam weren't touched this run, their
   #    apply jobs are skipped - that's fine, we only need them to not have
-  #    failed.
+  #    failed. We also explicitly require gke's own plan to have succeeded,
+  #    since always() below would otherwise let this run even after a failed
+  #    gke plan.
   # ---------------------------------------------------------------------------
   terraform-apply-gke:
     name: "Terraform Apply (gke)"
-    needs: [detect_changes, terraform-plan, terraform-apply-vpc, terraform-apply-iam]
+    needs: [detect_changes, terraform-plan-gke, terraform-apply-vpc, terraform-apply-iam]
     if: >
       always() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      contains(needs.detect_changes.outputs.components, 'gke') &&
+      needs.detect_changes.outputs.gke == 'true' &&
+      needs.terraform-plan-gke.result == 'success' &&
       (needs.terraform-apply-vpc.result == 'success' || needs.terraform-apply-vpc.result == 'skipped') &&
       (needs.terraform-apply-iam.result == 'success' || needs.terraform-apply-iam.result == 'skipped')
     runs-on: ubuntu-latest
