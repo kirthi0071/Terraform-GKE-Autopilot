@@ -2,10 +2,10 @@ project_id = "testing-project-499604"
 region     = "asia-south1"
 
 # Where to read the vpc/ and iam/ root modules' state from
-vpc_state_bucket = "enhub-tfstate-dev"
+vpc_state_bucket = "kirthi-tf"
 vpc_state_prefix = "gke-platform/dev/vpc"
 
-iam_state_bucket = "enhub-tfstate-dev"
+iam_state_bucket = "kirthi-tf"
 iam_state_prefix = "gke-platform/dev/iam"
 
 cluster_name = "gke-autopilot-dev"
