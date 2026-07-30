@@ -1,4 +1,4 @@
-project_id = "enhub-dev-123456"
+project_id = "testing-project-499604"
 region     = "asia-south1"
 
 service_account_id           = "gke-node-sa-dev"

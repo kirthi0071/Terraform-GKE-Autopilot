@@ -51,6 +51,25 @@ variable "node_service_account_email" {
   type        = string
 }
 
+# NOTE: these two must never be left as `null`. The upstream
+# gke-autopilot-cluster module's own defaults ARE null, but its variable
+# validation blocks do `var.x == null || contains([...], var.x)` - HCL
+# evaluates both sides of `||` before combining them, so contains() still
+# gets called with a null argument and errors out during `terraform
+# validate`/`plan`, even though the `== null` branch is true. Always pass
+# an explicit accepted value instead of relying on the module's default.
+variable "datapath_provider" {
+  description = "Datapath provider for the cluster. Autopilot requires Dataplane v2 (ADVANCED_DATAPATH)."
+  type        = string
+  default     = "ADVANCED_DATAPATH"
+}
+
+variable "private_ipv6_google_access" {
+  description = "Private IPv6 access to Google services. Disabled unless you specifically need IPv6."
+  type        = string
+  default     = "PRIVATE_IPV6_GOOGLE_ACCESS_DISABLED"
+}
+
 variable "release_channel" {
   description = "GKE release channel: RAPID, REGULAR, or STABLE"
   type        = string
