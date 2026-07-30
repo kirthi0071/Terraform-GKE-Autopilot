@@ -1,2 +1,2 @@
-bucket = "kirthi-tfstate-dev"
+bucket = "kirthi-tf"
 prefix = "gke-platform/dev/gke"
