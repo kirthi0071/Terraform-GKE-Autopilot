@@ -24,6 +24,9 @@ module "gke_autopilot" {
     }
   }
 
+  datapath_provider           = var.datapath_provider
+  private_ipv6_google_access  = var.private_ipv6_google_access
+
   workload_identity_config = {
     workload_pool = var.workload_pool
   }
