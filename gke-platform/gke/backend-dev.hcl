@@ -1,2 +1,2 @@
-bucket = "enhub-tfstate-dev"
+bucket = "kirthi-tfstate-dev"
 prefix = "gke-platform/dev/gke"
