@@ -1,3 +1,5 @@
+# gke-platform/modules/iam/main.tf
+
 resource "google_service_account" "gke_sa" {
   project      = var.project_id
   account_id   = var.service_account_id
