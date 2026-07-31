@@ -13,4 +13,8 @@ project_roles = [
 ]
 
 # Keep this empty until GKE cluster exists
-sa_bindings = {}
+sa_bindings = {
+# "roles/iam.workloadIdentityUser" = [
+ #   "serviceAccount:testing-project-499604.svc.id.goog[default/app-ksa]"
+  ]
+}
