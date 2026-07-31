@@ -15,7 +15,7 @@ project_roles = [
 sa_bindings = {
   # Example: let a specific Kubernetes ServiceAccount impersonate this GSA
   # via Workload Identity. Replace with your real KSA namespace/name.
-  "roles/iam.workloadIdentityUser" = [
-    "serviceAccount:testing-project-499604.svc.id.goog[default/app-ksa]"
-  ]
+ # "roles/iam.workloadIdentityUser" = [
+  #  "serviceAccount:testing-project-499604.svc.id.goog[default/app-ksa]"
+ # ]
 }
