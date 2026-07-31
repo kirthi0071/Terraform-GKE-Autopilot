@@ -1,40 +1,32 @@
 variable "project_id" {
-  description = "Project ID where the service account and IAM bindings will be created"
+  description = "Project ID where the service account will be created"
   type        = string
 }
 
 variable "service_account_id" {
-  description = "Account ID (the part before @) for the GKE node/workload service account"
+  description = "Account ID for the service account"
   type        = string
-  default     = "gke-node-sa"
 }
 
 variable "service_account_display_name" {
   description = "Display name for the service account"
   type        = string
-  default     = "GKE Autopilot Node Service Account"
 }
 
 variable "mode" {
-  description = "IAM binding mode for service_accounts_iam submodule: 'additive' or 'authoritative'"
+  description = "IAM binding mode ('additive' or 'authoritative')"
   type        = string
   default     = "additive"
 }
 
 variable "project_roles" {
-  description = "List of project-level IAM roles to grant the created service account"
+  description = "List of project-level IAM roles to grant"
   type        = list(string)
-  default = [
-    "roles/logging.logWriter",
-    "roles/monitoring.metricWriter",
-    "roles/monitoring.viewer",
-    "roles/stackdriver.resourceMetadata.writer",
-    "roles/artifactregistry.reader",
-  ]
+  default     = []
 }
 
 variable "bindings" {
-  description = "Map of role => list of members to bind directly ON the service account resource"
+  description = "Map of role => list of members to bind on the service account"
   type        = map(list(string))
   default     = {}
 }
