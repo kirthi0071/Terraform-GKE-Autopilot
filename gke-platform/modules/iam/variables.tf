@@ -22,7 +22,7 @@ variable "mode" {
 }
 
 variable "project_roles" {
-  description = "List of project-level IAM roles to grant the created service account (applied as project IAM members, not via service_accounts_iam)"
+  description = "List of project-level IAM roles to grant the created service account"
   type        = list(string)
   default = [
     "roles/logging.logWriter",
@@ -34,7 +34,7 @@ variable "project_roles" {
 }
 
 variable "bindings" {
-  description = "Map of role => list of members to bind directly ON the service account resource (e.g. who can impersonate/actAs it) via service_accounts_iam submodule"
+  description = "Map of role => list of members to bind directly ON the service account resource"
   type        = map(list(string))
   default     = {}
 }
