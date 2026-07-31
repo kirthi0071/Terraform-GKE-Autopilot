@@ -23,9 +23,3 @@ module "service_accounts_iam" {
 
   depends_on = [google_service_account.gke_sa]
 }
-
-# Ensure you export the SA email in your outputs so GKE can read it via terraform_remote_state!
-output "service_account_email" {
-  value       = google_service_account.gke_sa.email
-  description = "The email of the GKE service account"
-}
